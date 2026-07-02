@@ -1,4 +1,5 @@
-import { COOLDOWN_DURATIONS, UserSpamRecord } from '../../definition/spamlevel';
+import { LevelConfig } from '../../definition/levelConfig';
+import { UserSpamRecord } from '../../definition/spamlevel';
 import { Messages } from '../translations/locals/en';
 
 function formatDuration(ms: number): string {
@@ -13,13 +14,23 @@ function formatDuration(ms: number): string {
 	if (minutes > 0) return `${minutes} minute${minutes > 1 ? 's' : ''}`;
 	return `${totalSeconds} second${totalSeconds > 1 ? 's' : ''}`;
 }
-
-export function buildMessage(record: UserSpamRecord): string | null {
-	const fn = Messages[record.spammingLevel];
-	if (!fn) {
-		return null;
+export function buildMessage(
+	record: UserSpamRecord,
+	config: LevelConfig,
+): string | null {
+	const remainingMs = Math.max(0, record.cooldownUntil - Date.now());
+	const duration = formatDuration(
+		config.timeoutSeconds ? config.timeoutSeconds * 1000 : remainingMs,
+	);
+	if (config.message && config.message.trim()) {
+		return config.message
+			.replace(/\{user\}/g, `@${record.username}`)
+			.replace(/\{duration\}/g, duration);
 	}
-	const duration = formatDuration(COOLDOWN_DURATIONS[record.spammingLevel]);
+
+	const fn = Messages[record.spammingLevel];
+	if (!fn) return null;
+
 	return fn(record.username, duration);
 }
 export function formatCooldown(cooldownUntil: number): string {
