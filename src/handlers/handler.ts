@@ -23,6 +23,9 @@ import { buildLevelConfigOverviewModal } from '../modals/levelOverviewModal';
 import { ScheduleStore } from '../persistence/scheduleRports/scheduleStore';
 import { buildScheduleSetupModal } from '../modals/scheduleReportModal';
 import { UIKitSurfaceType } from '@rocket.chat/apps-engine/definition/uikit';
+import { AdminLogConfigStore } from '../persistence/scheduleRports/adminLogConfigStore';
+import { buildAdminAuditLogConfigModal } from '../modals/adminAuditLogModal';
+
 
 export class SpamMonitorHandler {
 	constructor(
@@ -266,6 +269,18 @@ export class SpamMonitorHandler {
 	public async scheduleReport(triggerId: string): Promise<void> {
 		const existing = await ScheduleStore.get(this.read);
 		const modal = buildScheduleSetupModal(this.appId, existing);
+		await this.modify
+			.getUiController()
+			.openSurfaceView(
+				{ ...modal, type: UIKitSurfaceType.MODAL },
+				{ triggerId },
+				this.sender,
+			);
+	}
+
+	public async showAdminAuditLog(triggerId: string): Promise<void> {
+		const savedConfig = await AdminLogConfigStore.get(this.read);
+		const modal = buildAdminAuditLogConfigModal(this.appId, savedConfig);
 		await this.modify
 			.getUiController()
 			.openSurfaceView(

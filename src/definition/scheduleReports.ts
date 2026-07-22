@@ -1,6 +1,7 @@
 import { CadencePreset } from '../enums/modals/scheduleReports';
-import { LoggedUserAction } from '../enums/scheduleReports';
+import { AdminLogCategory, LoggedUserAction } from '../enums/scheduleReports';
 import { SpammingLevel } from './spamlevel';
+
 
 export interface ScheduleDraft {
 	adminUserId: string;
@@ -42,4 +43,18 @@ export interface AdminActionLogEntry {
 	timestamp: number;
 	previousLevel?: SpammingLevel;
 	newLevel?: SpammingLevel;
+}
+
+export interface AdminLogConfig {
+	levelConfig: boolean;
+	scheduleReport: boolean;
+	userActions: boolean;
+}
+
+export interface ConfigAuditEntry {
+	category: AdminLogCategory;
+	action: string;
+	detail: string;
+	adminUsername: string;
+	timestamp: number;
 }

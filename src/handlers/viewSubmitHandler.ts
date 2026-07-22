@@ -50,6 +50,14 @@ import {
 import { DAILY_REPORT_JOB_ID } from '../core/schedulereport';
 import { AdminActionLogStore } from '../persistence/scheduleRports/adminActionLogStore';
 import { LOGGED_ACTIONS, LoggedUserAction } from '../enums/scheduleReports';
+import { ADMIN_AUDIT_LOG_MODAL_ID } from '../enums/modals/adminAuditLog';
+import { AdminLogConfigStore } from '../persistence/scheduleRports/adminLogConfigStore';
+import { AdminConfigAuditStore } from '../persistence/scheduleRports/adminConfigAuditStore';
+import { ADMIN_CONFIG_ACTION } from '../enums/scheduleReports';
+import { AdminLogCategory } from '../enums/scheduleReports';
+import { parseAdminAuditLogConfigState } from '../modals/adminAuditLogModal';
+import { levelLabel } from '../definition/levelConfig';
+
 
 export class ViewSubmitHandler {
 	constructor(
@@ -95,9 +103,20 @@ export class ViewSubmitHandler {
 				this.appId,
 			);
 		}
+
+		// Admin Audit Log config save
+		if (view.id === ADMIN_AUDIT_LOG_MODAL_ID) {
+			const config = parseAdminAuditLogConfigState(
+				view.state as Record<string, Record<string, unknown>>,
+			);
+			await AdminLogConfigStore.save(this.persistence, config);
+			return this.context.getInteractionResponder().successResponse();
+		}
+
 		if (!view.id.startsWith(CONFIRM_ACTION_MODAL_ID)) {
 			return this.context.getInteractionResponder().successResponse();
 		}
+
 
 		// view.id format: confirm_action_modal::<realAction>::<userId>::<roomId>
 		const parts = view.id.split('::');
@@ -261,6 +280,18 @@ export class ViewSubmitHandler {
 				scheduleNotification.ScheduleSet(user.username),
 			);
 
+			// Conditionally log if schedule report logging is enabled
+			const logConfig = await AdminLogConfigStore.get(this.read);
+			if (logConfig.scheduleReport) {
+				await AdminConfigAuditStore.log(this.persistence, this.read, {
+					category: AdminLogCategory.SCHEDULE_REPORT,
+					action: ADMIN_CONFIG_ACTION.SCHEDULE_SET,
+					detail: `Cron: ${cronExpression} | Cadence: ${draft.preset} | Time: ${draft.reportTime}`,
+					adminUsername: user.username,
+					timestamp: Date.now(),
+				});
+			}
+
 			return this.context.getInteractionResponder().successResponse();
 		} catch (err) {
 			console.error(
@@ -270,6 +301,7 @@ export class ViewSubmitHandler {
 			return this.context.getInteractionResponder().errorResponse();
 		}
 	}
+
 
 	private async finalizeScheduleDeletion(
 		user: IUser,
@@ -287,12 +319,25 @@ export class ViewSubmitHandler {
 				scheduleNotification.ScheduleRemoved(user.username),
 			);
 
+			// Conditionally log if schedule report logging is enabled
+			const logConfig = await AdminLogConfigStore.get(this.read);
+			if (logConfig.scheduleReport) {
+				await AdminConfigAuditStore.log(this.persistence, this.read, {
+					category: AdminLogCategory.SCHEDULE_REPORT,
+					action: ADMIN_CONFIG_ACTION.SCHEDULE_REMOVED,
+					detail: 'Scheduled report removed. No further automatic reports will be sent.',
+					adminUsername: user.username,
+					timestamp: Date.now(),
+				});
+			}
+
 			return this.context.getInteractionResponder().successResponse();
 		} catch (err) {
 			console.error('[ViewSubmitHandler] Failed to delete schedule', err);
 			return this.context.getInteractionResponder().errorResponse();
 		}
 	}
+
 
 	private async notifyScheduleChange(
 		user: IUser,
@@ -317,14 +362,27 @@ export class ViewSubmitHandler {
 		room: IRoom | null | undefined,
 	): Promise<void> {
 		await LevelConfigStore.resetLevel(this.read, this.persistence, level);
-		if (!room) return;
-		await sendNotification(this.read, this.modify, admin, room, {
-			message: levelConfigNotification.LevelConfigResetToDefault(
-				level,
-				admin.username,
-			),
-		});
+		if (room) {
+			await sendNotification(this.read, this.modify, admin, room, {
+				message: levelConfigNotification.LevelConfigResetToDefault(
+					level,
+					admin.username,
+				),
+			});
+		}
+		// Conditionally log if level config logging is enabled
+		const logConfig = await AdminLogConfigStore.get(this.read);
+		if (logConfig.levelConfig) {
+			await AdminConfigAuditStore.log(this.persistence, this.read, {
+				category: AdminLogCategory.LEVEL_CONFIG,
+				action: ADMIN_CONFIG_ACTION.LEVEL_CONFIG_RESET,
+				detail: `Level "${levelLabel(level)}" reset to default settings`,
+				adminUsername: admin.username,
+				timestamp: Date.now(),
+			});
+		}
 	}
+
 	private async handleEditLevelSubmit(
 		viewId: string,
 		state: Record<string, Record<string, unknown>>,
@@ -352,17 +410,30 @@ export class ViewSubmitHandler {
 			return;
 		}
 		await LevelConfigStore.save(read, persistence, incoming);
-		if (!room) return;
 		const changeSummary = formatConfigChangeSummary(
 			level,
 			before,
 			incoming,
 			diff,
 		);
-		await sendNotification(read, modify, admin, room, {
-			message: changeSummary,
-		});
+		if (room) {
+			await sendNotification(read, modify, admin, room, {
+				message: changeSummary,
+			});
+		}
+		// Conditionally log if level config logging is enabled
+		const logConfig = await AdminLogConfigStore.get(read);
+		if (logConfig.levelConfig) {
+			await AdminConfigAuditStore.log(persistence, read, {
+				category: AdminLogCategory.LEVEL_CONFIG,
+				action: ADMIN_CONFIG_ACTION.LEVEL_CONFIG_EDITED,
+				detail: changeSummary,
+				adminUsername: admin.username,
+				timestamp: Date.now(),
+			});
+		}
 	}
+
 	private async executeAction(
 		action: LoggedUserAction,
 		targetUser: IUser,

@@ -9,7 +9,9 @@ export const slashNotifications = {
 	MANAGE_MISSING_USERNAME: 'Usage: `/spammonitor manage <username>`',
 	LEVEL_MISSING_LEVEL: 'Usage: `/spammonitor level`',
 	SCHEDULE_MISSING_TRIGGER: 'Usage: `/spammonitor schedule`',
+	ADMIN_LOG_MISSING_TRIGGER: 'Usage: `/spammonitor adminlog`',
 };
+
 
 export const slashCommandHelp = {
 	HELP:
@@ -19,5 +21,7 @@ export const slashCommandHelp = {
 		'`/spammonitor list <Level>` — users at a specific level e.g. `list review` for admin review users\n' +
 		'`/spammonitor manage <username>` — open admin controls for a flagged user\n' +
 		'`/spammonitor level` — configure action and notification per spam level\n' +
-		'`/spammonitor schedule` — configure daily anti-spam report',
+		'`/spammonitor schedule` — configure daily anti-spam report\n' +
+		'`/spammonitor adminlog` — configure and view the admin audit log',
 };
+

@@ -119,6 +119,17 @@ export class SpamMonitorCommand implements ISlashCommand {
 				break;
 			}
 
+			case SpamMonitorParam.ADMIN_LOG: {
+				if (!triggerId) {
+					await handler.sendNotification(
+						slashNotifications.ADMIN_LOG_MISSING_TRIGGER,
+					);
+					return;
+				}
+				await handler.showAdminAuditLog(triggerId);
+				break;
+			}
+
 			default:
 				await handler.sendNotification(slashCommandHelp.HELP);
 				break;

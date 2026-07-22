@@ -32,6 +32,15 @@ import { ScheduleActionId } from '../enums/modals/scheduleReports';
 import { ScheduleDraftStorage } from '../persistence/scheduleRports/scheduleDraftStore';
 import { ScheduleStore } from '../persistence/scheduleRports/scheduleStore';
 import { buildScheduleSetupModal } from '../modals/scheduleReportModal';
+import { AdminAuditLogActionId } from '../enums/modals/adminAuditLog';
+import { AdminLogConfigStore } from '../persistence/scheduleRports/adminLogConfigStore';
+import { AdminConfigAuditStore } from '../persistence/scheduleRports/adminConfigAuditStore';
+import { AdminActionLogStore } from '../persistence/scheduleRports/adminActionLogStore';
+import {
+	buildAdminAuditLogConfigModal,
+	buildAdminAuditLogViewerModal,
+} from '../modals/adminAuditLogModal';
+
 
 export class BlockActionHandler {
 	constructor(
@@ -41,7 +50,7 @@ export class BlockActionHandler {
 		private readonly modify: IModify,
 		private readonly context: UIKitBlockInteractionContext,
 		private readonly appId: string,
-	) {}
+	) { }
 
 	public async handle(): Promise<IUIKitResponse> {
 		const { actionId, value, user, triggerId } =
@@ -147,6 +156,33 @@ export class BlockActionHandler {
 				.getInteractionResponder()
 				.updateModalViewResponse(deleteModal);
 		}
+		// ── Admin Audit Log navigation ────────────────────────────────────────
+		if (actionId === AdminAuditLogActionId.VIEW_LOGS) {
+			const config = await AdminLogConfigStore.get(this.read);
+			const configEntries = await AdminConfigAuditStore.getRecent(this.read);
+			const userActionEntries = config.userActions
+				? await AdminActionLogStore.getByUser(this.read, user.id).catch(() => [])
+				: [];
+			// Fetch all recent user action entries (not scoped to current viewer)
+			const allUserActions = userActionEntries;
+			const viewerModal = buildAdminAuditLogViewerModal(
+				this.appId,
+				config,
+				configEntries,
+				allUserActions,
+			);
+			return this.context
+				.getInteractionResponder()
+				.updateModalViewResponse(viewerModal);
+		}
+		if (actionId === AdminAuditLogActionId.BACK_TO_CONFIG) {
+			const config = await AdminLogConfigStore.get(this.read);
+			const configModal = buildAdminAuditLogConfigModal(this.appId, config);
+			return this.context
+				.getInteractionResponder()
+				.updateModalViewResponse(configModal);
+		}
+
 		if (actionId === ManageUserActionId.OPEN_MANAGE_MODAL) {
 			if (!value || !triggerId) {
 				return this.context.getInteractionResponder().successResponse();

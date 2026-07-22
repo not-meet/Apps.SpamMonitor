@@ -273,3 +273,44 @@ export const scheduleValidationText = {
 	invalidTime: 'Enter a valid time as HH:MM, e.g. 09:00',
 	missingCustomDays: 'Select at least one day for Custom cadence.',
 };
+
+export const adminAuditLogModalText = {
+	configStage: {
+		title: 'Admin Audit Log',
+		header:
+			'Choose which admin actions to log. Logs are stored and can be reviewed on demand via *View Logs*.',
+		categoriesLabel: 'Log Categories',
+		categoriesPlaceholder: 'Select categories to enable…',
+		categoryOptions: {
+			levelConfig: 'Level config changes',
+			scheduleReport: 'Schedule report changes',
+			userActions: 'User actions (vouch, cooldown reset, level changes)',
+		},
+		viewLogsButton: 'View Logs ↓',
+		saveButton: 'Save Config',
+		noChangeHint:
+			'_Select at least one category and click **Save Config** to enable logging._',
+	},
+	viewerStage: {
+		title: 'Admin Audit Log — Recent Entries',
+		backButton: '← Back to Config',
+		categoryHeadings: {
+			levelConfig: '*Level Config Changes*',
+			scheduleReport: '*Schedule Report Changes*',
+			userActions: '*User Actions*',
+		},
+		emptyForCategory: (label: string) =>
+			`_No ${label} entries logged yet._`,
+		noCategoriesEnabled:
+			'_No log categories are enabled. Go back to Config to enable logging._',
+		noLogsAtAll:
+			'_Logging is enabled but no entries have been recorded yet. Actions will appear here once they occur._',
+		entryLine: (
+			ts: string,
+			action: string,
+			detail: string,
+			adminUsername: string,
+		) => `*${ts}* — ${action}\n${detail}\n_by @${adminUsername}_`,
+	},
+};
+
