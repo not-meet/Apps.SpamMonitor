@@ -59,13 +59,6 @@ export class FlagLogStore {
 		];
 	}
 
-	private static recentEventsScopeAssoc(): RocketChatAssociationRecord {
-		return new RocketChatAssociationRecord(
-			RocketChatAssociationModel.MISC,
-			'antispam-recent-flags',
-		);
-	}
-
 	public static async log(
 		persistence: IPersistence,
 		read: IRead,
@@ -154,5 +147,4 @@ export class FlagLogStore {
 			(r) => r.flagCount !== undefined,
 		);
 	}
-
 }
