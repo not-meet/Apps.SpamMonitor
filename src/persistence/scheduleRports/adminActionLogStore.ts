@@ -102,7 +102,7 @@ export class AdminActionLogStore {
 		}
 		await persistence.updateByAssociations(recentAssocs, recentDoc, true);
 	}
-	
+
 	public static async getByUser(
 		read: IRead,
 		userId: string,
@@ -143,6 +143,8 @@ export class AdminActionLogStore {
 		const perDay = await Promise.all(
 			days.map((day) => AdminActionLogStore.getActionsForDay(read, day)),
 		);
-		return perDay.reduce((acc, day) => acc.concat(day), []);
+		return perDay
+			.reduce((acc, day) => acc.concat(day), [])
+			.filter((entry) => entry.timestamp >= sinceTimestamp);
 	}
 }
