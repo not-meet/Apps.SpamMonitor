@@ -257,9 +257,7 @@ export class ViewSubmitHandler {
 			const record: ScheduleRecord = {
 				...draft,
 				cronExpression,
-				...(existing?.lastReportSentAt !== undefined && {
-					lastReportSentAt: existing.lastReportSentAt,
-				}),
+				lastReportSentAt: existing?.lastReportSentAt ?? Date.now(),
 				updatedAt: Date.now(),
 			};
 			await ScheduleStore.replace(this.persistence, record);

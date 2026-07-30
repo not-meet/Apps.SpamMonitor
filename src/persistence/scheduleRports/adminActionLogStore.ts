@@ -12,6 +12,7 @@ import {
 	MAX_RECENT_ACTIONS,
 	MAX_DAILY_ACTIONS,
 	DAY_RECORD_RETENTION_DAYS,
+	MAX_REPORT_WINDOW_DAYS,
 } from '../../constants/scheduleLogStore';
 
 export class AdminActionLogStore {
@@ -92,7 +93,7 @@ export class AdminActionLogStore {
 		}
 
 		await persistence.updateByAssociations(dailyAssocs, dailyDoc, true);
-
+		await AdminActionLogStore.pruneOldDays(persistence, read, day);
 		const recentAssocs = AdminActionLogStore.recentActionsAssocs(
 			entry.userId,
 		);
@@ -107,7 +108,6 @@ export class AdminActionLogStore {
 			recentDoc.entries.shift();
 		}
 		await persistence.updateByAssociations(recentAssocs, recentDoc, true);
-		await AdminActionLogStore.pruneOldDays(persistence, read, day);
 	}
 
 	public static async getByUser(
@@ -146,7 +146,14 @@ export class AdminActionLogStore {
 		read: IRead,
 		sinceTimestamp: number,
 	): Promise<AdminActionLogEntry[]> {
-		const days = daysBetween(sinceTimestamp);
+		if (!Number.isFinite(sinceTimestamp)) {
+			throw new Error(
+				`getActionsSince: invalid sinceTimestamp: ${sinceTimestamp}`,
+			);
+		}
+
+		const days = daysBetween(sinceTimestamp).slice(-MAX_REPORT_WINDOW_DAYS);
+
 		const perDay = await Promise.all(
 			days.map((day) => AdminActionLogStore.getActionsForDay(read, day)),
 		);
@@ -179,9 +186,9 @@ export class AdminActionLogStore {
 		if (staleDays.length) {
 			await Promise.all(
 				staleDays.map((staleDay) =>
-					persistence.removeByAssociations([
+					persistence.removeByAssociation(
 						AdminActionLogStore.dailyActionScopeAssoc(staleDay),
-					]),
+					),
 				),
 			);
 			indexDoc.days = indexDoc.days.filter((d) => d >= cutoffKey);

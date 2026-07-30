@@ -12,7 +12,7 @@ export interface ScheduleDraft {
 
 export interface ScheduleRecord extends ScheduleDraft {
 	cronExpression: string;
-	lastReportSentAt?: number;
+	lastReportSentAt: number;
 	updatedAt: number;
 }
 export interface FlagLogEntry {
