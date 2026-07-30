@@ -14,9 +14,15 @@ import {
 	AdminAuditLogBlockId,
 } from '../enums/modals/adminAuditLog';
 import { AdminLogCategory } from '../enums/scheduleReports';
-import { AdminLogConfig, ConfigAuditEntry } from '../definition/scheduleReports';
+import {
+	AdminLogConfig,
+	ConfigAuditEntry,
+} from '../definition/scheduleReports';
 import { AdminActionLogEntry } from '../definition/scheduleReports';
-import { adminAuditLogModalText as msg, commonModalText } from '../lib/translations/locals/en';
+import {
+	adminAuditLogModalText as msg,
+	commonModalText,
+} from '../lib/translations/locals/en';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Category option values used in the multi-select and for parsing state
@@ -36,9 +42,12 @@ export function buildAdminAuditLogConfigModal(
 	savedConfig?: AdminLogConfig | null,
 ): IUIKitModalViewParam {
 	const initialValues: string[] = [];
-	if (savedConfig?.levelConfig) initialValues.push(AdminLogCategory.LEVEL_CONFIG);
-	if (savedConfig?.scheduleReport) initialValues.push(AdminLogCategory.SCHEDULE_REPORT);
-	if (savedConfig?.userActions) initialValues.push(AdminLogCategory.USER_ACTIONS);
+	if (savedConfig?.levelConfig)
+		initialValues.push(AdminLogCategory.LEVEL_CONFIG);
+	if (savedConfig?.scheduleReport)
+		initialValues.push(AdminLogCategory.SCHEDULE_REPORT);
+	if (savedConfig?.userActions)
+		initialValues.push(AdminLogCategory.USER_ACTIONS);
 
 	const headerBlock: SectionBlock = {
 		type: 'section',
@@ -184,7 +193,10 @@ export function buildAdminAuditLogViewerModal(
 		};
 		return {
 			id: ADMIN_AUDIT_LOG_MODAL_ID,
-			title: { type: TextObjectType.PLAIN_TEXT, text: msg.viewerStage.title },
+			title: {
+				type: TextObjectType.PLAIN_TEXT,
+				text: msg.viewerStage.title,
+			},
 			blocks: [backBlock, emptyBlock],
 			close: {
 				type: 'button',
@@ -199,27 +211,34 @@ export function buildAdminAuditLogViewerModal(
 		};
 	}
 
-	const blocks: (SectionBlock | ActionsBlock | DividerBlock | ContextBlock)[] = [
-		backBlock,
-	];
+	const blocks: (
+		| SectionBlock
+		| ActionsBlock
+		| DividerBlock
+		| ContextBlock
+	)[] = [backBlock];
 
 	// ── Level Config section ──────────────────────────────────────────────────
 	if (config.levelConfig) {
 		blocks.push(divider(appId, 'lc'));
-		blocks.push(sectionHeading(
-			appId,
-			'lc-h',
-			msg.viewerStage.categoryHeadings.levelConfig,
-		));
+		blocks.push(
+			sectionHeading(
+				appId,
+				'lc-h',
+				msg.viewerStage.categoryHeadings.levelConfig,
+			),
+		);
 		const lcEntries = configEntries
 			.filter((e) => e.category === AdminLogCategory.LEVEL_CONFIG)
 			.slice(0, 10);
 		if (lcEntries.length === 0) {
-			blocks.push(sectionText(
-				appId,
-				'lc-empty',
-				msg.viewerStage.emptyForCategory('level config'),
-			));
+			blocks.push(
+				sectionText(
+					appId,
+					'lc-empty',
+					msg.viewerStage.emptyForCategory('level config'),
+				),
+			);
 		} else {
 			for (const entry of lcEntries) {
 				blocks.push(entryBlock(appId, `lc-${entry.timestamp}`, entry));
@@ -230,20 +249,24 @@ export function buildAdminAuditLogViewerModal(
 	// ── Schedule Report section ───────────────────────────────────────────────
 	if (config.scheduleReport) {
 		blocks.push(divider(appId, 'sr'));
-		blocks.push(sectionHeading(
-			appId,
-			'sr-h',
-			msg.viewerStage.categoryHeadings.scheduleReport,
-		));
+		blocks.push(
+			sectionHeading(
+				appId,
+				'sr-h',
+				msg.viewerStage.categoryHeadings.scheduleReport,
+			),
+		);
 		const srEntries = configEntries
 			.filter((e) => e.category === AdminLogCategory.SCHEDULE_REPORT)
 			.slice(0, 10);
 		if (srEntries.length === 0) {
-			blocks.push(sectionText(
-				appId,
-				'sr-empty',
-				msg.viewerStage.emptyForCategory('schedule report'),
-			));
+			blocks.push(
+				sectionText(
+					appId,
+					'sr-empty',
+					msg.viewerStage.emptyForCategory('schedule report'),
+				),
+			);
 		} else {
 			for (const entry of srEntries) {
 				blocks.push(entryBlock(appId, `sr-${entry.timestamp}`, entry));
@@ -254,18 +277,22 @@ export function buildAdminAuditLogViewerModal(
 	// ── User Actions section ──────────────────────────────────────────────────
 	if (config.userActions) {
 		blocks.push(divider(appId, 'ua'));
-		blocks.push(sectionHeading(
-			appId,
-			'ua-h',
-			msg.viewerStage.categoryHeadings.userActions,
-		));
+		blocks.push(
+			sectionHeading(
+				appId,
+				'ua-h',
+				msg.viewerStage.categoryHeadings.userActions,
+			),
+		);
 		const uaEntries = userActionEntries.slice(0, 10);
 		if (uaEntries.length === 0) {
-			blocks.push(sectionText(
-				appId,
-				'ua-empty',
-				msg.viewerStage.emptyForCategory('user action'),
-			));
+			blocks.push(
+				sectionText(
+					appId,
+					'ua-empty',
+					msg.viewerStage.emptyForCategory('user action'),
+				),
+			);
 		} else {
 			for (const entry of uaEntries) {
 				blocks.push(userActionEntryBlock(appId, entry));
@@ -295,10 +322,10 @@ export function buildAdminAuditLogViewerModal(
 // ─────────────────────────────────────────────────────────────────────────────
 
 function formatTs(timestamp: number): string {
-	return new Date(timestamp)
-		.toISOString()
-		.slice(0, 16)
-		.replace('T', ' ') + ' UTC';
+	return (
+		new Date(timestamp).toISOString().slice(0, 16).replace('T', ' ') +
+		' UTC'
+	);
 }
 
 function divider(appId: string, suffix: string): DividerBlock {
@@ -308,11 +335,7 @@ function divider(appId: string, suffix: string): DividerBlock {
 	};
 }
 
-function sectionHeading(
-	appId: string,
-	id: string,
-	text: string,
-): SectionBlock {
+function sectionHeading(appId: string, id: string, text: string): SectionBlock {
 	return {
 		type: 'section',
 		blockId: `${AdminAuditLogBlockId.LOG_SECTION}-${id}`,
@@ -352,9 +375,10 @@ function userActionEntryBlock(
 	appId: string,
 	entry: AdminActionLogEntry,
 ): SectionBlock {
-	const detail = entry.previousLevel !== undefined && entry.newLevel !== undefined
-		? `Level: ${entry.previousLevel} → ${entry.newLevel} for @${entry.username}`
-		: `Target: @${entry.username}`;
+	const detail =
+		entry.previousLevel !== undefined && entry.newLevel !== undefined
+			? `Level: ${entry.previousLevel} → ${entry.newLevel} for @${entry.username}`
+			: `Target: @${entry.username}`;
 	return {
 		type: 'section',
 		blockId: `${AdminAuditLogBlockId.LOG_SECTION}-ua-${entry.timestamp}-${entry.userId}`,

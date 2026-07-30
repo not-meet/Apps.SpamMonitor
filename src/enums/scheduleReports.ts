@@ -25,4 +25,3 @@ export const ADMIN_CONFIG_ACTION = {
 	SCHEDULE_SET: 'Schedule set',
 	SCHEDULE_REMOVED: 'Schedule removed',
 } as const;
-

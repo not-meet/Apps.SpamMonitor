@@ -12,7 +12,6 @@ export const slashNotifications = {
 	ADMIN_LOG_MISSING_TRIGGER: 'Usage: `/spammonitor adminlog`',
 };
 
-
 export const slashCommandHelp = {
 	HELP:
 		'*SpamMonitor commands*\n' +
@@ -24,4 +23,3 @@ export const slashCommandHelp = {
 		'`/spammonitor schedule` — configure daily anti-spam report\n' +
 		'`/spammonitor adminlog` — configure and view the admin audit log',
 };
-

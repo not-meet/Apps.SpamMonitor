@@ -26,7 +26,6 @@ import { UIKitSurfaceType } from '@rocket.chat/apps-engine/definition/uikit';
 import { AdminLogConfigStore } from '../persistence/scheduleRports/adminLogConfigStore';
 import { buildAdminAuditLogConfigModal } from '../modals/adminAuditLogModal';
 
-
 export class SpamMonitorHandler {
 	constructor(
 		private readonly sender: IUser,

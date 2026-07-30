@@ -38,5 +38,5 @@ export const CADENCE_PRESET_DAYS: Record<CadencePreset, number[]> = {
 	[CadencePreset.DAILY]: [],
 	[CadencePreset.WEEKDAYS]: [1, 2, 3, 4, 5],
 	[CadencePreset.WEEKLY]: [1],
-	[CadencePreset.CUSTOM]: [], 
+	[CadencePreset.CUSTOM]: [],
 };

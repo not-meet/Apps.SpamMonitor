@@ -277,8 +277,7 @@ export const scheduleValidationText = {
 export const adminAuditLogModalText = {
 	configStage: {
 		title: 'Admin Audit Log',
-		header:
-			'Choose which admin actions to log. Logs are stored and can be reviewed on demand via *View Logs*.',
+		header: 'Choose which admin actions to log. Logs are stored and can be reviewed on demand via *View Logs*.',
 		categoriesLabel: 'Log Categories',
 		categoriesPlaceholder: 'Select categories to enable…',
 		categoryOptions: {
@@ -313,4 +312,3 @@ export const adminAuditLogModalText = {
 		) => `*${ts}* — ${action}\n${detail}\n_by @${adminUsername}_`,
 	},
 };
-
