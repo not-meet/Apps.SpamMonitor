@@ -2,12 +2,11 @@ import { CadencePreset } from '../enums/modals/scheduleReports';
 import { AdminLogCategory, LoggedUserAction } from '../enums/scheduleReports';
 import { SpammingLevel } from './spamlevel';
 
-
 export interface ScheduleDraft {
 	adminUserId: string;
 	preset: CadencePreset;
-	days: number[]; 
-	reportTime: string; 
+	days: number[];
+	reportTime: string;
 	utcOffsetMinutes: number;
 }
 

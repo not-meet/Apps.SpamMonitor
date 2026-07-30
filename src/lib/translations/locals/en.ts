@@ -277,8 +277,7 @@ export const scheduleValidationText = {
 export const adminAuditLogModalText = {
 	configStage: {
 		title: 'Admin Audit Log',
-		header:
-			'Choose which admin actions to log. Logs are stored and can be reviewed on demand via *View Logs*.',
+		header: 'Choose which admin actions to log. Logs are stored and can be reviewed on demand via *View Logs*.',
 		categoriesLabel: 'Log Categories',
 		categoriesPlaceholder: 'Select categories to enable…',
 		categoryOptions: {
@@ -313,4 +312,46 @@ export const adminAuditLogModalText = {
 		) => `*${ts}* — ${action}\n${detail}\n_by @${adminUsername}_`,
 	},
 };
+export const whitelistNotification = {
+	WhitelistUpdated: (
+		addedChannels: string[],
+		removedChannels: string[],
+		addedRoles: string[],
+		removedRoles: string[],
+		notFoundChannels: string[],
+	): string => {
+		const parts: string[] = [];
 
+		if (addedChannels.length > 0) {
+			parts.push(
+				`Added ${addedChannels.map((c) => `#${c}`).join(', ')} to the whitelist.`,
+			);
+		}
+		if (removedChannels.length > 0) {
+			parts.push(
+				`Removed ${removedChannels.map((c) => `#${c}`).join(', ')} from the whitelist.`,
+			);
+		}
+		if (addedRoles.length > 0) {
+			parts.push(
+				`Added role(s) ${addedRoles.map((r) => `\`${r}\``).join(', ')} to the whitelist.`,
+			);
+		}
+		if (removedRoles.length > 0) {
+			parts.push(
+				`Removed role(s) ${removedRoles.map((r) => `\`${r}\``).join(', ')} from the whitelist.`,
+			);
+		}
+		if (notFoundChannels.length > 0) {
+			parts.push(
+				`Could not find: ${notFoundChannels.map((c) => `#${c}`).join(', ')}. check the channel names for any uppercase letters.`,
+			);
+		}
+
+		if (parts.length === 0) {
+			return 'Spam monitor whitelist saved — no changes.';
+		}
+
+		return `Spam monitor whitelist updated. ${parts.join(' ')}`;
+	},
+};

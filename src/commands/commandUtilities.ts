@@ -129,6 +129,16 @@ export class SpamMonitorCommand implements ISlashCommand {
 				await handler.showAdminAuditLog(triggerId);
 				break;
 			}
+			case SpamMonitorParam.WHITELIST: {
+				if (!triggerId) {
+					await handler.sendNotification(
+						slashNotifications.WHITELIST_MISSING_TRIGGER,
+					);
+					return;
+				}
+				await handler.showWhitelist(triggerId);
+				break;
+			}
 
 			default:
 				await handler.sendNotification(slashCommandHelp.HELP);

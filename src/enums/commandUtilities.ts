@@ -7,4 +7,5 @@ export enum SpamMonitorParam {
 	LEVEL = 'level',
 	SCHEDULE = 'schedule',
 	ADMIN_LOG = 'adminlog',
+	WHITELIST = 'whitelist',
 }

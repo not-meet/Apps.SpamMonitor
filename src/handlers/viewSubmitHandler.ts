@@ -23,6 +23,7 @@ import {
 	levelConfigNotification,
 	scheduleNotification,
 	scheduleValidationText,
+	whitelistNotification,
 } from '../lib/translations/locals/en';
 import { EDIT_LEVEL_MODAL_ID } from '../enums/modals/levelConfig';
 import { LevelConfigStore } from '../persistence/levelConfigStore';
@@ -57,7 +58,9 @@ import { ADMIN_CONFIG_ACTION } from '../enums/scheduleReports';
 import { AdminLogCategory } from '../enums/scheduleReports';
 import { parseAdminAuditLogConfigState } from '../modals/adminAuditLogModal';
 import { levelLabel } from '../definition/levelConfig';
-
+import {  WHITELIST_OVERVIEW_MODAL_ID } from '../definition/whitelist';
+import { parseWhitelistChannelListInput, parseWhitelistRoleListInput } from '../modals/whitelistModals';
+import { WhitelistStore } from '../persistence/whiteListStore';
 
 export class ViewSubmitHandler {
 	constructor(
@@ -71,6 +74,7 @@ export class ViewSubmitHandler {
 
 	public async handle(): Promise<IUIKitResponse> {
 		const { view, user } = this.context.getInteractionData();
+		console.log(view.id);
 
 		if (view.id.startsWith(EDIT_LEVEL_MODAL_ID)) {
 			const roomStorage = new RoomInteractionStorage(
@@ -104,6 +108,12 @@ export class ViewSubmitHandler {
 			);
 		}
 
+if (view.id === WHITELIST_OVERVIEW_MODAL_ID) {
+	return this.handleWhitelistSave(
+		view.state as Record<string, Record<string, unknown>>,
+		user,
+	);
+}
 		// Admin Audit Log config save
 		if (view.id === ADMIN_AUDIT_LOG_MODAL_ID) {
 			const config = parseAdminAuditLogConfigState(
@@ -116,7 +126,6 @@ export class ViewSubmitHandler {
 		if (!view.id.startsWith(CONFIRM_ACTION_MODAL_ID)) {
 			return this.context.getInteractionResponder().successResponse();
 		}
-
 
 		// view.id format: confirm_action_modal::<realAction>::<userId>::<roomId>
 		const parts = view.id.split('::');
@@ -193,6 +202,81 @@ export class ViewSubmitHandler {
 		return this.context.getInteractionResponder().successResponse();
 	}
 
+	private async handleWhitelistSave(
+	state: Record<string, Record<string, unknown>>,
+	user: IUser,
+): Promise<IUIKitResponse> {
+	const { roomIds: currentRoomIds, roleIds } = await WhitelistStore.get(this.read);
+	console.log(roleIds, `currentRoleIds`);
+	const currentLabels = await Promise.all(
+		currentRoomIds.map(async (id) => {
+			const room = await this.read.getRoomReader().getById(id);
+			return { id, label: room?.slugifiedName ?? room?.displayName ?? id };
+		}),
+	);
+
+	const newChannelNames = parseWhitelistChannelListInput(state);
+	const removedRooms = currentLabels.filter(
+		(r) => !newChannelNames.includes(r.label),
+	);
+	const addedNames = newChannelNames.filter(
+		(name) => !currentLabels.some((r) => r.label === name),
+	);
+
+	const notFound: string[] = [];
+	for (const name of addedNames) {
+		console.log('[antispam] raw addedName:', JSON.stringify(name));
+		const room = await this.read.getRoomReader().getByName(name);
+		console.log('[antispam] getByName result:', room?.slugifiedName, room?.id);
+		if (room) {
+			await WhitelistStore.addRoom(this.read, this.persistence, room.id);
+		} else {
+			notFound.push(name);
+		}
+	}
+	for (const r of removedRooms) {
+		await WhitelistStore.removeRoom(this.read, this.persistence, r.id);
+	}
+
+	const { roleIds: currentRoleIds } = await WhitelistStore.get(this.read);
+	const newRoleIds = parseWhitelistRoleListInput(state);
+	const addedRoles = newRoleIds.filter((r) => !currentRoleIds.includes(r));
+	const removedRoles = currentRoleIds.filter((r) => !newRoleIds.includes(r));
+
+	for (const roleId of addedRoles) {
+		await WhitelistStore.addRole(this.read, this.persistence, roleId);
+	}
+	for (const roleId of removedRoles) {
+		await WhitelistStore.removeRole(this.read, this.persistence, roleId);
+	}
+
+	await this.notifyWhitelistChange(
+		user,
+		whitelistNotification.WhitelistUpdated(
+			addedNames.filter((n) => !notFound.includes(n)),
+			removedRooms.map((r) => r.label),
+			addedRoles,
+			removedRoles,
+			notFound,
+		),
+	);
+
+	return this.context.getInteractionResponder().successResponse();
+}
+private async notifyWhitelistChange(user: IUser, message: string): Promise<void> {
+	const roomStorage = new RoomInteractionStorage(
+		this.persistence,
+		this.read.getPersistenceReader(),
+		user.id,
+	);
+	const roomId = await roomStorage.getInteractionRoomId();
+	const room = roomId
+		? await this.read.getRoomReader().getById(roomId)
+		: null;
+	if (!room) return;
+
+	await sendNotification(this.read, this.modify, user, room, { message });
+}
 	private async handleScheduleSetupSubmit(
 		viewId: string,
 		state: Record<string, Record<string, unknown>>,
@@ -302,7 +386,6 @@ export class ViewSubmitHandler {
 		}
 	}
 
-
 	private async finalizeScheduleDeletion(
 		user: IUser,
 	): Promise<IUIKitResponse> {
@@ -337,7 +420,6 @@ export class ViewSubmitHandler {
 			return this.context.getInteractionResponder().errorResponse();
 		}
 	}
-
 
 	private async notifyScheduleChange(
 		user: IUser,

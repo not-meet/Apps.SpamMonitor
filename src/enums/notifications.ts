@@ -10,8 +10,8 @@ export const slashNotifications = {
 	LEVEL_MISSING_LEVEL: 'Usage: `/spammonitor level`',
 	SCHEDULE_MISSING_TRIGGER: 'Usage: `/spammonitor schedule`',
 	ADMIN_LOG_MISSING_TRIGGER: 'Usage: `/spammonitor adminlog`',
+	WHITELIST_MISSING_TRIGGER: 'Usage: `/spammonitor whitelist`',
 };
-
 
 export const slashCommandHelp = {
 	HELP:
@@ -22,6 +22,6 @@ export const slashCommandHelp = {
 		'`/spammonitor manage <username>` — open admin controls for a flagged user\n' +
 		'`/spammonitor level` — configure action and notification per spam level\n' +
 		'`/spammonitor schedule` — configure daily anti-spam report\n' +
-		'`/spammonitor adminlog` — configure and view the admin audit log',
+		'`/spammonitor adminlog` — configure and view the admin audit log\n' +
+		'`/spammonitor whitelist` — configure the whitelist for channels and roles to be exempt from spam monitoring',
 };
-

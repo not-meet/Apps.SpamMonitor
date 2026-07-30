@@ -16,7 +16,11 @@ import {
 	TextObjectType,
 } from '@rocket.chat/ui-kit';
 import { IUIKitModalViewParam } from '@rocket.chat/apps-engine/definition/uikit/UIKitInteractionResponder';
-import { computeNextRunPreview, formatOffset, formatTime12h } from '../core/scheduleCron';
+import {
+	computeNextRunPreview,
+	formatOffset,
+	formatTime12h,
+} from '../core/scheduleCron';
 import {
 	commonModalText,
 	scheduleSetupModalText as msg,

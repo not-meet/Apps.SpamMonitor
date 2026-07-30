@@ -41,7 +41,6 @@ import {
 	buildAdminAuditLogViewerModal,
 } from '../modals/adminAuditLogModal';
 
-
 export class BlockActionHandler {
 	constructor(
 		private readonly read: IRead,
@@ -50,7 +49,7 @@ export class BlockActionHandler {
 		private readonly modify: IModify,
 		private readonly context: UIKitBlockInteractionContext,
 		private readonly appId: string,
-	) { }
+	) {}
 
 	public async handle(): Promise<IUIKitResponse> {
 		const { actionId, value, user, triggerId } =
@@ -159,9 +158,13 @@ export class BlockActionHandler {
 		// ── Admin Audit Log navigation ────────────────────────────────────────
 		if (actionId === AdminAuditLogActionId.VIEW_LOGS) {
 			const config = await AdminLogConfigStore.get(this.read);
-			const configEntries = await AdminConfigAuditStore.getRecent(this.read);
+			const configEntries = await AdminConfigAuditStore.getRecent(
+				this.read,
+			);
 			const userActionEntries = config.userActions
-				? await AdminActionLogStore.getByUser(this.read, user.id).catch(() => [])
+				? await AdminActionLogStore.getByUser(this.read, user.id).catch(
+						() => [],
+					)
 				: [];
 			// Fetch all recent user action entries (not scoped to current viewer)
 			const allUserActions = userActionEntries;
@@ -177,7 +180,10 @@ export class BlockActionHandler {
 		}
 		if (actionId === AdminAuditLogActionId.BACK_TO_CONFIG) {
 			const config = await AdminLogConfigStore.get(this.read);
-			const configModal = buildAdminAuditLogConfigModal(this.appId, config);
+			const configModal = buildAdminAuditLogConfigModal(
+				this.appId,
+				config,
+			);
 			return this.context
 				.getInteractionResponder()
 				.updateModalViewResponse(configModal);

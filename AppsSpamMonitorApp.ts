@@ -43,13 +43,14 @@ import {
 } from './src/constants/config';
 import { ViewSubmitHandler } from './src/handlers/viewSubmitHandler';
 import { BlockActionHandler } from './src/handlers/blockActionHandler';
-import { LevelConfigStore } from './src/persistence/levelConfigStore';
 import {
 	DAILY_REPORT_JOB_ID,
 	ScheduledReporter,
 } from './src/core/schedulereport';
 import { IJobContext } from '@rocket.chat/apps-engine/definition/scheduler';
 import { ScheduleStore } from './src/persistence/scheduleRports/scheduleStore';
+import { WhitelistStore } from './src/persistence/whiteListStore';
+import { LevelConfigStore } from './src/persistence/levelConfigStore';
 
 export class AppsSpamMonitorApp
 	extends App
@@ -288,6 +289,18 @@ export class AppsSpamMonitorApp
 	): Promise<boolean> {
 		if (!message.sender || !message.room) return false;
 		try {
+			if (await WhitelistStore.isRoomWhitelisted(read, message.room.id)) {
+				return false;
+			}
+			if (
+				await WhitelistStore.isUserWhitelistedByRole(
+					read,
+					message.sender,
+				)
+			) {
+				return false;
+			}
+
 			const { restricted } = await UserStatusStore.isRestricted(
 				read,
 				persistence,
@@ -326,7 +339,15 @@ export class AppsSpamMonitorApp
 			!this.processor?.isNewUser(sender)
 		)
 			return;
+
 		try {
+			if (await WhitelistStore.isRoomWhitelisted(read, message.room.id)) {
+				return;
+			}
+			if (await WhitelistStore.isUserWhitelistedByRole(read, sender)) {
+				return;
+			}
+
 			const result = await this.processor.analyzeMessage(
 				message,
 				read,
