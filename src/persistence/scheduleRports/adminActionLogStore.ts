@@ -11,6 +11,7 @@ import { daysBetween } from '../../lib/utils/scheduleSummaryUtils';
 import {
 	MAX_RECENT_ACTIONS,
 	MAX_DAILY_ACTIONS,
+	DAY_RECORD_RETENTION_DAYS,
 } from '../../constants/scheduleLogStore';
 
 export class AdminActionLogStore {
@@ -57,7 +58,12 @@ export class AdminActionLogStore {
 			),
 		];
 	}
-
+	private static dayIndexAssoc(): RocketChatAssociationRecord {
+		return new RocketChatAssociationRecord(
+			RocketChatAssociationModel.MISC,
+			'antispam-action-days-index',
+		);
+	}
 	public static async log(
 		persistence: IPersistence,
 		read: IRead,
@@ -101,6 +107,7 @@ export class AdminActionLogStore {
 			recentDoc.entries.shift();
 		}
 		await persistence.updateByAssociations(recentAssocs, recentDoc, true);
+		await AdminActionLogStore.pruneOldDays(persistence, read, day);
 	}
 
 	public static async getByUser(
@@ -146,5 +153,40 @@ export class AdminActionLogStore {
 		return perDay
 			.reduce((acc, day) => acc.concat(day), [])
 			.filter((entry) => entry.timestamp >= sinceTimestamp);
+	}
+	private static async pruneOldDays(
+		persistence: IPersistence,
+		read: IRead,
+		day: string,
+	): Promise<void> {
+		const indexAssoc = AdminActionLogStore.dayIndexAssoc();
+		const existingIndex = await read
+			.getPersistenceReader()
+			.readByAssociation(indexAssoc);
+		const indexDoc = existingIndex.length
+			? (existingIndex[0] as { days: string[] })
+			: { days: [] };
+
+		if (!indexDoc.days.includes(day)) {
+			indexDoc.days.push(day);
+		}
+
+		const cutoff = new Date();
+		cutoff.setUTCDate(cutoff.getUTCDate() - DAY_RECORD_RETENTION_DAYS);
+		const cutoffKey = cutoff.toISOString().slice(0, 10);
+
+		const staleDays = indexDoc.days.filter((d) => d < cutoffKey);
+		if (staleDays.length) {
+			await Promise.all(
+				staleDays.map((staleDay) =>
+					persistence.removeByAssociations([
+						AdminActionLogStore.dailyActionScopeAssoc(staleDay),
+					]),
+				),
+			);
+			indexDoc.days = indexDoc.days.filter((d) => d >= cutoffKey);
+		}
+
+		await persistence.updateByAssociations([indexAssoc], indexDoc, true);
 	}
 }

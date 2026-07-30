@@ -2,18 +2,17 @@ import { CadencePreset } from '../enums/modals/scheduleReports';
 import { AdminLogCategory, LoggedUserAction } from '../enums/scheduleReports';
 import { SpammingLevel } from './spamlevel';
 
-
 export interface ScheduleDraft {
 	adminUserId: string;
 	preset: CadencePreset;
-	days: number[]; 
-	reportTime: string; 
+	days: number[];
+	reportTime: string;
 	utcOffsetMinutes: number;
 }
 
 export interface ScheduleRecord extends ScheduleDraft {
 	cronExpression: string;
-	lastReportSentAt: number;
+	lastReportSentAt?: number;
 	updatedAt: number;
 }
 export interface FlagLogEntry {

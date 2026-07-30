@@ -33,9 +33,9 @@ export class ScheduledReporter {
 		if (!appUser) return;
 
 		const scheduleRecord = await ScheduleStore.get(read);
-		const since = scheduleRecord?.lastReportSentAt
-			? scheduleRecord.lastReportSentAt
-			: Date.now() - 24 * 60 * 60 * 1000;
+		const since =
+			scheduleRecord?.lastReportSentAt ??
+			Date.now() - 24 * 60 * 60 * 1000;
 
 		const summaries = await FlagLogStore.getDailySummariesSince(
 			read,

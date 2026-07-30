@@ -58,7 +58,6 @@ import { AdminLogCategory } from '../enums/scheduleReports';
 import { parseAdminAuditLogConfigState } from '../modals/adminAuditLogModal';
 import { levelLabel } from '../definition/levelConfig';
 
-
 export class ViewSubmitHandler {
 	constructor(
 		private readonly read: IRead,
@@ -116,7 +115,6 @@ export class ViewSubmitHandler {
 		if (!view.id.startsWith(CONFIRM_ACTION_MODAL_ID)) {
 			return this.context.getInteractionResponder().successResponse();
 		}
-
 
 		// view.id format: confirm_action_modal::<realAction>::<userId>::<roomId>
 		const parts = view.id.split('::');
@@ -259,7 +257,9 @@ export class ViewSubmitHandler {
 			const record: ScheduleRecord = {
 				...draft,
 				cronExpression,
-				lastReportSentAt: existing?.lastReportSentAt ?? 0,
+				...(existing?.lastReportSentAt !== undefined && {
+					lastReportSentAt: existing.lastReportSentAt,
+				}),
 				updatedAt: Date.now(),
 			};
 			await ScheduleStore.replace(this.persistence, record);
@@ -302,7 +302,6 @@ export class ViewSubmitHandler {
 		}
 	}
 
-
 	private async finalizeScheduleDeletion(
 		user: IUser,
 	): Promise<IUIKitResponse> {
@@ -337,7 +336,6 @@ export class ViewSubmitHandler {
 			return this.context.getInteractionResponder().errorResponse();
 		}
 	}
-
 
 	private async notifyScheduleChange(
 		user: IUser,
