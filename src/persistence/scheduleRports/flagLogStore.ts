@@ -1,197 +1,232 @@
 import {
-    IPersistence,
-    IRead,
+	IPersistence,
+	IRead,
 } from '@rocket.chat/apps-engine/definition/accessors';
 import {
-    RocketChatAssociationModel,
-    RocketChatAssociationRecord,
+	RocketChatAssociationModel,
+	RocketChatAssociationRecord,
 } from '@rocket.chat/apps-engine/definition/metadata';
 import {
-    DailyFlagSummary,
-    FlagLogEntry,
+	DailyFlagSummary,
+	FlagLogEntry,
 } from '../../definition/scheduleReports';
 import { daysBetween } from '../../lib/utils/scheduleSummaryUtils';
 import {
-    MAX_RECENT_EVENTS,
-    MAX_ROOMS_PER_SUMMARY,
-    MAX_REPORT_WINDOW_DAYS,
-    DAY_RECORD_RETENTION_DAYS,
+	MAX_RECENT_EVENTS,
+	MAX_ROOMS_PER_SUMMARY,
+	MAX_REPORT_WINDOW_DAYS,
+	DAY_RECORD_RETENTION_DAYS,
 } from '../../constants/scheduleLogStore';
+import { withKeyLock } from '../../core/cache/keyedMutex';
+
+// pruneOldDays touches a single doc (the day-index) shared across every user,
+// not a per-user doc — so it needs its own lock key, distinct from any
+// userId, or two different users' log() calls would still race on it even
+// once each user's own writes are individually serialized below.
+const FLAG_DAY_INDEX_LOCK_KEY = '__antispam-flag-day-index-lock__';
 
 export class FlagLogStore {
-    private static dayKey(timestamp: number): string {
-        return new Date(timestamp).toISOString().slice(0, 10);
-    }
+	private static dayKey(timestamp: number): string {
+		return new Date(timestamp).toISOString().slice(0, 10);
+	}
 
-    private static dailySummaryAssocs(
-        userId: string,
-        day: string,
-    ): RocketChatAssociationRecord[] {
-        return [
-            new RocketChatAssociationRecord(
-                RocketChatAssociationModel.USER,
-                userId,
-            ),
-            new RocketChatAssociationRecord(
-                RocketChatAssociationModel.MISC,
-                `antispam-day:${day}`,
-            ),
-        ];
-    }
+	private static dailySummaryAssocs(
+		userId: string,
+		day: string,
+	): RocketChatAssociationRecord[] {
+		return [
+			new RocketChatAssociationRecord(
+				RocketChatAssociationModel.USER,
+				userId,
+			),
+			new RocketChatAssociationRecord(
+				RocketChatAssociationModel.MISC,
+				`antispam-day:${day}`,
+			),
+		];
+	}
 
-    private static dailyScopeAssoc(day: string): RocketChatAssociationRecord {
-        return new RocketChatAssociationRecord(
-            RocketChatAssociationModel.MISC,
-            `antispam-day:${day}`,
-        );
-    }
+	private static dailyScopeAssoc(day: string): RocketChatAssociationRecord {
+		return new RocketChatAssociationRecord(
+			RocketChatAssociationModel.MISC,
+			`antispam-day:${day}`,
+		);
+	}
 
-    private static recentEventsAssocs(
-        userId: string,
-    ): RocketChatAssociationRecord[] {
-        return [
-            new RocketChatAssociationRecord(
-                RocketChatAssociationModel.USER,
-                userId,
-            ),
-            new RocketChatAssociationRecord(
-                RocketChatAssociationModel.MISC,
-                'antispam-recent-flags',
-            ),
-        ];
-    }
+	private static recentEventsAssocs(
+		userId: string,
+	): RocketChatAssociationRecord[] {
+		return [
+			new RocketChatAssociationRecord(
+				RocketChatAssociationModel.USER,
+				userId,
+			),
+			new RocketChatAssociationRecord(
+				RocketChatAssociationModel.MISC,
+				'antispam-recent-flags',
+			),
+		];
+	}
 
-    private static dayIndexAssoc(): RocketChatAssociationRecord {
-        return new RocketChatAssociationRecord(
-            RocketChatAssociationModel.MISC,
-            'antispam-flag-days-index',
-        );
-    }
+	private static dayIndexAssoc(): RocketChatAssociationRecord {
+		return new RocketChatAssociationRecord(
+			RocketChatAssociationModel.MISC,
+			'antispam-flag-days-index',
+		);
+	}
 
-    public static async log(
-        persistence: IPersistence,
-        read: IRead,
-        entry: FlagLogEntry,
-    ): Promise<void> {
-        const day = FlagLogStore.dayKey(entry.timestamp);
-        const summaryAssocs = FlagLogStore.dailySummaryAssocs(
-            entry.userId,
-            day,
-        );
-        const existingSummaries = await read
-            .getPersistenceReader()
-            .readByAssociations(summaryAssocs);
-        const existing = existingSummaries.length
-            ? (existingSummaries[0] as DailyFlagSummary)
-            : null;
-        const summary: DailyFlagSummary = existing
-            ? {
-                ...existing,
-                flagCount: existing.flagCount + 1,
-                triggers: {
-                    ...existing.triggers,
-                    [entry.trigger]:
-                        (existing.triggers[entry.trigger] || 0) + 1,
-                },
-                actions: {
-                    ...existing.actions,
-                    [entry.action]:
-                        (existing.actions[entry.action] || 0) + 1,
-                },
-                rooms: existing.rooms.includes(entry.roomName)
-                    ? existing.rooms
-                    : existing.rooms.length < MAX_ROOMS_PER_SUMMARY
-                        ? [...existing.rooms, entry.roomName]
-                        : existing.rooms,
-            }
-            : {
-                userId: entry.userId,
-                username: entry.username,
-                date: day,
-                flagCount: 1,
-                triggers: { [entry.trigger]: 1 },
-                actions: { [entry.action]: 1 },
-                rooms: [entry.roomName],
-            };
-        await persistence.updateByAssociations(summaryAssocs, summary, true);
-        await FlagLogStore.pruneOldDays(persistence, read, day);
+	// Both read-modify-write sequences below (daily summary, recent-events)
+	// touch docs scoped to entry.userId, so both go under one withKeyLock(userId)
+	// call — this also means log() serializes against UserStatusStore.escalate()
+	// for the same user IF both go through the same process-wide queue (they do:
+	// withKeyLock's Map is module-level, so any two calls using the same string
+	// key share a queue regardless of which file/class calls it from).
+	public static async log(
+		persistence: IPersistence,
+		read: IRead,
+		entry: FlagLogEntry,
+	): Promise<void> {
+		await withKeyLock(entry.userId, async () => {
+			const day = FlagLogStore.dayKey(entry.timestamp);
+			const summaryAssocs = FlagLogStore.dailySummaryAssocs(
+				entry.userId,
+				day,
+			);
+			const existingSummaries = await read
+				.getPersistenceReader()
+				.readByAssociations(summaryAssocs);
+			const existing = existingSummaries.length
+				? (existingSummaries[0] as DailyFlagSummary)
+				: null;
+			const summary: DailyFlagSummary = existing
+				? {
+						...existing,
+						flagCount: existing.flagCount + 1,
+						triggers: {
+							...existing.triggers,
+							[entry.trigger]:
+								(existing.triggers[entry.trigger] || 0) + 1,
+						},
+						actions: {
+							...existing.actions,
+							[entry.action]:
+								(existing.actions[entry.action] || 0) + 1,
+						},
+						rooms: existing.rooms.includes(entry.roomName)
+							? existing.rooms
+							: existing.rooms.length < MAX_ROOMS_PER_SUMMARY
+								? [...existing.rooms, entry.roomName]
+								: existing.rooms,
+					}
+				: {
+						userId: entry.userId,
+						username: entry.username,
+						date: day,
+						flagCount: 1,
+						triggers: { [entry.trigger]: 1 },
+						actions: { [entry.action]: 1 },
+						rooms: [entry.roomName],
+					};
+			await persistence.updateByAssociations(
+				summaryAssocs,
+				summary,
+				true,
+			);
+			await FlagLogStore.pruneOldDays(persistence, read, day);
 
-        const recentAssocs = FlagLogStore.recentEventsAssocs(entry.userId);
-        const existingRecent = await read
-            .getPersistenceReader()
-            .readByAssociations(recentAssocs);
-        const recentDoc = existingRecent.length
-            ? (existingRecent[0] as { entries: FlagLogEntry[] })
-            : { entries: [] };
-        recentDoc.entries.push(entry);
-        while (recentDoc.entries.length > MAX_RECENT_EVENTS) {
-            recentDoc.entries.shift();
-        }
-        await persistence.updateByAssociations(recentAssocs, recentDoc, true);
-    }
+			const recentAssocs = FlagLogStore.recentEventsAssocs(entry.userId);
+			const existingRecent = await read
+				.getPersistenceReader()
+				.readByAssociations(recentAssocs);
+			const recentDoc = existingRecent.length
+				? (existingRecent[0] as { entries: FlagLogEntry[] })
+				: { entries: [] };
+			recentDoc.entries.push(entry);
+			while (recentDoc.entries.length > MAX_RECENT_EVENTS) {
+				recentDoc.entries.shift();
+			}
+			await persistence.updateByAssociations(
+				recentAssocs,
+				recentDoc,
+				true,
+			);
+		});
+	}
 
-    public static async getDailySummariesSince(
-        read: IRead,
-        sinceTimestamp: number,
-    ): Promise<DailyFlagSummary[]> {
-        if (!Number.isFinite(sinceTimestamp)) {
-            throw new Error(
-                `getDailySummariesSince: invalid sinceTimestamp: ${sinceTimestamp}`,
-            );
-        }
+	public static async getDailySummariesSince(
+		read: IRead,
+		sinceTimestamp: number,
+	): Promise<DailyFlagSummary[]> {
+		if (!Number.isFinite(sinceTimestamp)) {
+			throw new Error(
+				`getDailySummariesSince: invalid sinceTimestamp: ${sinceTimestamp}`,
+			);
+		}
 
-        const days = daysBetween(sinceTimestamp).slice(-MAX_REPORT_WINDOW_DAYS);
+		const days = daysBetween(sinceTimestamp).slice(-MAX_REPORT_WINDOW_DAYS);
 
-        const perDay = await Promise.all(
-            days.map((day) => FlagLogStore.getDailySummariesForDay(read, day)),
-        );
-        return perDay.reduce((acc, day) => acc.concat(day), []);
-    }
+		const perDay = await Promise.all(
+			days.map((day) => FlagLogStore.getDailySummariesForDay(read, day)),
+		);
+		return perDay.reduce((acc, day) => acc.concat(day), []);
+	}
 
-    public static async getDailySummariesForDay(
-        read: IRead,
-        date: string,
-    ): Promise<DailyFlagSummary[]> {
-        const records = await read
-            .getPersistenceReader()
-            .readByAssociation(FlagLogStore.dailyScopeAssoc(date));
-        return (records as DailyFlagSummary[]).filter(
-            (r) => r.flagCount !== undefined,
-        );
-    }
-    private static async pruneOldDays(
-        persistence: IPersistence,
-        read: IRead,
-        day: string,
-    ): Promise<void> {
-        const indexAssoc = FlagLogStore.dayIndexAssoc();
-        const existingIndex = await read
-            .getPersistenceReader()
-            .readByAssociation(indexAssoc);
-        const indexDoc = existingIndex.length
-            ? (existingIndex[0] as { days: string[] })
-            : { days: [] };
+	public static async getDailySummariesForDay(
+		read: IRead,
+		date: string,
+	): Promise<DailyFlagSummary[]> {
+		const records = await read
+			.getPersistenceReader()
+			.readByAssociation(FlagLogStore.dailyScopeAssoc(date));
+		return (records as DailyFlagSummary[]).filter(
+			(r) => r.flagCount !== undefined,
+		);
+	}
 
-        if (!indexDoc.days.includes(day)) {
-            indexDoc.days.push(day);
-        }
+	// Shared across every user — locked by a fixed global key, NOT userId,
+	// since two different users flagged concurrently both touch this same
+	// index doc. Nested inside the caller's per-user lock in log() above;
+	// that's safe (no deadlock risk) since withKeyLock is a promise queue,
+	// not a blocking lock, and the two keys never form a cycle.
+	private static async pruneOldDays(
+		persistence: IPersistence,
+		read: IRead,
+		day: string,
+	): Promise<void> {
+		await withKeyLock(FLAG_DAY_INDEX_LOCK_KEY, async () => {
+			const indexAssoc = FlagLogStore.dayIndexAssoc();
+			const existingIndex = await read
+				.getPersistenceReader()
+				.readByAssociation(indexAssoc);
+			const indexDoc = existingIndex.length
+				? (existingIndex[0] as { days: string[] })
+				: { days: [] };
 
-        const cutoff = new Date();
-        cutoff.setUTCDate(cutoff.getUTCDate() - DAY_RECORD_RETENTION_DAYS);
-        const cutoffKey = cutoff.toISOString().slice(0, 10);
+			if (!indexDoc.days.includes(day)) {
+				indexDoc.days.push(day);
+			}
 
-        const staleDays = indexDoc.days.filter((d) => d < cutoffKey);
-        if (staleDays.length) {
-            await Promise.all(
-                staleDays.map((staleDay) =>
-                    persistence.removeByAssociation(
-                        FlagLogStore.dailyScopeAssoc(staleDay),
-                    ),
-                ),
-            );
-            indexDoc.days = indexDoc.days.filter((d) => d >= cutoffKey);
-        }
+			const cutoff = new Date();
+			cutoff.setUTCDate(cutoff.getUTCDate() - DAY_RECORD_RETENTION_DAYS);
+			const cutoffKey = cutoff.toISOString().slice(0, 10);
 
-        await persistence.updateByAssociations([indexAssoc], indexDoc, true);
-    }
+			const staleDays = indexDoc.days.filter((d) => d < cutoffKey);
+			if (staleDays.length) {
+				await Promise.all(
+					staleDays.map((staleDay) =>
+						persistence.removeByAssociation(
+							FlagLogStore.dailyScopeAssoc(staleDay),
+						),
+					),
+				);
+				indexDoc.days = indexDoc.days.filter((d) => d >= cutoffKey);
+			}
+
+			await persistence.updateByAssociations(
+				[indexAssoc],
+				indexDoc,
+				true,
+			);
+		});
+	}
 }
