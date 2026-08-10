@@ -5,4 +5,6 @@ export enum SpamMonitorParam {
 	ADMIN_REVIEW = 'review',
 	MANAGE = 'manage',
 	LEVEL = 'level',
+	SCHEDULE = 'schedule',
+	CONFIG = 'config',
 }
