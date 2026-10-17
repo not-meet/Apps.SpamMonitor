@@ -4,8 +4,11 @@
     "password": "",
     "ignoredFiles": [
         "**/README.md",
+        "**/bun.lock",
+        "**/bun.lockb",
         "**/package-lock.json",
-        "**/package.json",
+        "**/yarn.lock",
+        "**/.yarn/**",
         "**/tslint.json",
         "**/tsconfig.json",
         "**/*.js",
